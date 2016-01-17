@@ -334,6 +334,8 @@ function serialize(s::SerializationState, t::TypeName)
     serialize_cycle(s, t) && return
     writetag(s.io, TYPENAME_TAG)
     serialize(s, object_number(t))
+    serialize(s, t.name)
+    serialize(s, t.module)
     serialize(s, t.names)
     serialize(s, t.primary.super)
     serialize(s, t.primary.parameters)
@@ -630,13 +632,22 @@ end
 
 function deserialize(s::SerializationState, ::Type{TypeName})
     number = deserialize(s)
-    mod = __deserialized_types__
+    name = deserialize(s)
+    mod = deserialize(s)
     if haskey(known_object_data, number)
         tn = known_object_data[number]::TypeName
         name = tn.name
+        mod = tn.module
+        makenew = false
+    elseif isdefined(mod, name)
+        tn = getfield(mod, name).name
+        # TODO: confirm somehow that the types match
+        name = tn.name
+        mod = tn.module
         makenew = false
     else
         name = gensym()
+        mod = __deserialized_types__
         tn = ccall(:jl_new_typename_in, Any, (Any, Any), name, mod)
         makenew = true
     end
